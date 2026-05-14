@@ -1,0 +1,101 @@
+
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: loan_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db-init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loan_user -d loan_risk_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  python-scorer:
+    build:
+      context: ./python-scorer
+      dockerfile: Dockerfile
+    container_name: loan_python_scorer
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 5
+
+  java-engine:
+    build:
+      context: ./java-engine
+      dockerfile: Dockerfile
+    container_name: loan_java_engine
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/loan_risk_db
+      SPRING_DATASOURCE_USERNAME: loan_user
+      SPRING_DATASOURCE_PASSWORD: loan_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "java", "-version"]
+      interval: 15s
+      retries: 8
+
+  go-gateway:
+    build:
+      context: ./go-gateway
+      dockerfile: Dockerfile
+    container_name: loan_go_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PYTHON_BASE_URL: ${PYTHON_BASE_URL}
+      JAVA_BASE_URL: ${JAVA_BASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python-scorer:
+        condition: service_started
+      java-engine:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      retries: 5
+  streamlit-ui:
+    build:
+      context: ./streamlit-ui
+      dockerfile: Dockerfile
+
+    container_name: loan_streamlit_ui
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      GO_BACKEND_URL: http://go-gateway:8080
+
+    depends_on:
+      go-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+volumes:
+  postgres_data:
+ 

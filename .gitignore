@@ -1,0 +1,32 @@
+# Mac
+.DS_Store
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Go
+bin/
+vendor/
+
+# Java
+target/
+*.class
+*.jar
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Docker
+postgres_data/
+
+# Node
+node_modules/
