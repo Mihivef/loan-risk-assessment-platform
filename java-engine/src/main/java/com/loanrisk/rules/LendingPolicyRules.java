@@ -13,7 +13,7 @@ public class LendingPolicyRules {
 
     private static final int    MIN_CIBIL_SCORE          = 650;
     private static final double MAX_FRAUD_PROBABILITY    = 0.25;
-    private static final double MAX_DEBT_TO_INCOME       = 0.55;  // 55% of monthly income
+    private static final double MAX_DEBT_TO_INCOME       = 0.55;  
     private static final double MIN_YEARS_EMPLOYED       = 0.5;
     private static final double MIN_ANNUAL_INCOME        = 180000; // ₹1.8 lakh
 

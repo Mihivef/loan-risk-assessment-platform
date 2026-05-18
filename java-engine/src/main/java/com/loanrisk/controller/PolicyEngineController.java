@@ -24,7 +24,7 @@ public class PolicyEngineController {
     @PostMapping("/evaluate")
     public ResponseEntity<PolicyEvalResponse> evaluate(@RequestBody PolicyEvalRequest req) {
         PolicyEvalResponse response = service.evaluate(req);
-        int httpStatus = "APPROVED".equals(response.decision) ? 200 : 200; // always 200; decision is in body
+        int httpStatus = "APPROVED".equals(response.decision) ? 200 : 200; 
         return ResponseEntity.ok(response);
     }
 

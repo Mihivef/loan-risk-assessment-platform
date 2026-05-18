@@ -12,9 +12,9 @@ public class PolicyEvalRequest {
     @JsonProperty("annual_income")      public double annualIncome;
     @JsonProperty("existing_monthly_emis") public double existingMonthlyEmis;
     @JsonProperty("cibil_score")        public int    cibilScore;
-    @JsonProperty("ml_credit_score")    public double mlCreditScore;   // 0.0–1.0 from Python
-    @JsonProperty("risk_band")          public String riskBand;        // LOW/MEDIUM/HIGH/VERY_HIGH
-    @JsonProperty("fraud_probability")  public double fraudProbability; // 0.0–1.0 from Python
+    @JsonProperty("ml_credit_score")    public double mlCreditScore;   
+    @JsonProperty("risk_band")          public String riskBand;        
+    @JsonProperty("fraud_probability")  public double fraudProbability; 
     @JsonProperty("employment_type")    public String employmentType;
     @JsonProperty("years_employed")     public double yearsEmployed;
 }
