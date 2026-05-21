@@ -3,187 +3,316 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../python-scorer'))
  
 from models.schemas import CreditScoreRequest, RiskBand
-from services.credit_scorer import score_credit_risk
- 
- 
- 
-def make_request(**kwargs) -> CreditScoreRequest:
-    defaults = {
-        "application_id":      1,
-        "annual_income":       960000,
-        "existing_monthly_emis": 3000,
-        "employment_type":     "salaried",
-        "years_employed":      3.5,
-        "cibil_score":         760,
-        "requested_amount":    400000,
-        "loan_type":           "personal",
-    }
-    defaults.update(kwargs)
-    return CreditScoreRequest(**defaults)
- 
- 
- 
-class TestLowRiskApplicant:
- 
-    def test_high_cibil_gets_low_risk_band(self):
-        req = make_request(cibil_score=800, annual_income=1200000,
-                           existing_monthly_emis=0, years_employed=5)
-        result = score_credit_risk(req)
-        assert result.risk_band == RiskBand.LOW
- 
-    def test_high_cibil_gets_high_ml_score(self):
-        req = make_request(cibil_score=820, annual_income=1500000,
-                           existing_monthly_emis=2000, years_employed=6)
-        result = score_credit_risk(req)
-        assert result.ml_credit_score >= 0.75
- 
-    def test_low_risk_has_no_risk_factors(self):
-        req = make_request(cibil_score=800, annual_income=2000000,
-                           existing_monthly_emis=0, years_employed=5)
-        result = score_credit_risk(req)
-        assert len(result.risk_factors) == 0
- 
-    def test_salaried_employee_gets_better_score_than_self_employed(self):
-        salaried = make_request(employment_type="salaried",   cibil_score=730)
-        self_emp = make_request(employment_type="self_employed", cibil_score=730)
-        res_sal  = score_credit_risk(salaried)
-        res_self = score_credit_risk(self_emp)
-        assert res_sal.ml_credit_score > res_self.ml_credit_score
- 
-    def test_low_dti_produces_low_debt_to_income_ratio(self):
-        req = make_request(annual_income=1200000, existing_monthly_emis=0,
-                           requested_amount=300000)
-        result = score_credit_risk(req)
-        assert result.debt_to_income_ratio < 0.3
- 
- 
- 
-class TestMediumRiskApplicant:
- 
-    def test_average_cibil_gets_medium_risk_band(self):
-        req = make_request(cibil_score=680, annual_income=600000,
-                           existing_monthly_emis=8000, years_employed=2)
-        result = score_credit_risk(req)
-        assert result.risk_band in [RiskBand.MEDIUM, RiskBand.HIGH]
- 
-    def test_medium_score_between_055_and_075(self):
-        req = make_request(cibil_score=700, annual_income=700000,
-                           existing_monthly_emis=5000, years_employed=2)
-        result = score_credit_risk(req)
-        assert 0.40 <= result.ml_credit_score <= 0.80
- 
-    def test_below_average_cibil_adds_risk_factor(self):
-        req = make_request(cibil_score=660)
-        result = score_credit_risk(req)
-        assert any("CIBIL" in f or "cibil" in f.lower() for f in result.risk_factors)
- 
- 
- 
-class TestHighRiskApplicant:
- 
-    def test_low_cibil_gets_high_risk_band(self):
-        req = make_request(cibil_score=580, annual_income=300000,
-                           existing_monthly_emis=15000, years_employed=0.5)
-        result = score_credit_risk(req)
-        assert result.risk_band in [RiskBand.HIGH, RiskBand.VERY_HIGH]
- 
-    def test_very_low_cibil_gets_low_ml_score(self):
-        req = make_request(cibil_score=400, annual_income=200000,
-                           existing_monthly_emis=8000, years_employed=0.3)
-        result = score_credit_risk(req)
-        assert result.ml_credit_score < 0.35
- 
-    def test_high_dti_adds_risk_factor(self):
-      
-        req = make_request(annual_income=300000, existing_monthly_emis=18000,
-                           requested_amount=200000)
-        result = score_credit_risk(req)
-        dti_flags = [f for f in result.risk_factors if "debt" in f.lower() or "income" in f.lower() or "dti" in f.lower()]
-        assert len(dti_flags) > 0
- 
-    def test_short_employment_adds_risk_factor(self):
-        req = make_request(years_employed=0.3)
-        result = score_credit_risk(req)
-        emp_flags = [f for f in result.risk_factors if "employment" in f.lower() or "year" in f.lower()]
-        assert len(emp_flags) > 0
- 
-    def test_high_loan_to_income_ratio_adds_risk_factor(self):
-        # requesting 10x income
-        req = make_request(annual_income=300000, requested_amount=3000000)
-        result = score_credit_risk(req)
-        income_flags = [f for f in result.risk_factors if "income" in f.lower() or "amount" in f.lower()]
-        assert len(income_flags) > 0
- 
- 
- 
-class TestScoreRangeValidation:
- 
-    def test_score_always_between_0_and_1(self):
-        test_cases = [
-            make_request(cibil_score=300, annual_income=100000),
-            make_request(cibil_score=900, annual_income=5000000),
-            make_request(cibil_score=600, annual_income=500000),
-        ]
-        for req in test_cases:
-            result = score_credit_risk(req)
-            assert 0.0 <= result.ml_credit_score <= 1.0, \
-                f"Score {result.ml_credit_score} out of range for CIBIL {req.cibil_score}"
- 
-    def test_confidence_always_positive(self):
-        req = make_request()
-        result = score_credit_risk(req)
-        assert result.confidence > 0
- 
-    def test_dti_always_non_negative(self):
-        req = make_request(existing_monthly_emis=0)
-        result = score_credit_risk(req)
-        assert result.debt_to_income_ratio >= 0
- 
-    def test_higher_cibil_gives_higher_score(self):
-        low_cibil  = make_request(cibil_score=500)
-        high_cibil = make_request(cibil_score=850)
-        r_low  = score_credit_risk(low_cibil)
-        r_high = score_credit_risk(high_cibil)
-        assert r_high.ml_credit_score > r_low.ml_credit_score
- 
-    def test_risk_band_matches_score(self):
-        req    = make_request()
-        result = score_credit_risk(req)
-        score  = result.ml_credit_score
-        if score >= 0.75:
-            assert result.risk_band == RiskBand.LOW
-        elif score >= 0.55:
-            assert result.risk_band == RiskBand.MEDIUM
-        elif score >= 0.35:
-            assert result.risk_band == RiskBand.HIGH
-        else:
-            assert result.risk_band == RiskBand.VERY_HIGH
- 
-    def test_self_employed_adds_risk_factor(self):
-        req    = make_request(employment_type="self_employed")
-        result = score_credit_risk(req)
-        emp_flags = [f for f in result.risk_factors if "self" in f.lower() or "employ" in f.lower()]
-        assert len(emp_flags) > 0
- 
- 
- 
-class TestLoanTypeVariations:
- 
-    def test_home_loan_with_good_profile(self):
-        req = make_request(loan_type="home", requested_amount=3500000,
-                           annual_income=2400000, cibil_score=820, years_employed=6)
-        result = score_credit_risk(req)
-        assert result.risk_band in [RiskBand.LOW, RiskBand.MEDIUM]
- 
-    def test_education_loan_with_young_applicant(self):
-        req = make_request(loan_type="education", requested_amount=1000000,
-                           annual_income=300000, years_employed=0.5, cibil_score=650)
-        result = score_credit_risk(req)
-        assert result.ml_credit_score is not None
- 
-    def test_business_loan_self_employed(self):
-        req = make_request(loan_type="business", employment_type="business_owner",
-                           annual_income=1800000, requested_amount=2000000, cibil_score=720)
-        result = score_credit_risk(req)
-        assert 0.0 <= result.ml_credit_score <= 1.0
- 
+from services.credit_scorer import( 
+    score_credit_risk,
+    _score_cibil,
+    _score_dti,
+    _score_employment,
+    _score_income_ratio,
+    _score_tenure,
+    _estimate_emi,
+    _score_to_band
+)
+
+def test_cibil_score_():
+    risk_factors = []
+    score = _score_cibil(850, risk_factors)
+
+    assert score > 0.9
+    assert risk_factors == []
+
+def test_cibil_score_should_return_expected_score():
+    risk_factors = []
+    score = _score_cibil(650, risk_factors)
+
+    expected = (650 - 300) / 600
+    assert score == pytest.approx(expected, rel=1e-2)
+
+    assert risk_factors == []
+
+def test_cibil_score_should_return_zero_for_low_score():
+    risk_factors = []
+    score = _score_cibil(300, risk_factors)
+
+    assert score == 0
+    assert "low CIBIL score (300)" in risk_factors
+
+def test_cibil_score_should_return_zero_for_below_min():
+    risk_factors = []
+    score = _score_cibil(200, risk_factors)
+
+    assert score == 0
+    assert "low CIBIL score (200)" in risk_factors
+
+def test_cibil_score_should_return_one_for_above_max():
+    risk_factors = []
+    score = _score_cibil(900, risk_factors)
+
+    assert score == 1
+    assert risk_factors == []
+
+    assert score == 1
+def test_estimate_emi_normal():
+    emi = _estimate_emi(
+        principal=100000,
+        annual_rate=12,
+        months=12
+    )
+
+    assert emi > 8000
+    assert emi < 10000
+
+def test_estimate_emi_should_return_expected_emi_for_zero_interest():
+    emi = _estimate_emi(
+        principal=120000,
+        annual_rate=0,
+        months=12
+    )
+
+    assert emi == 10000
+
+def test_estimate_emi_should_return_zero_for_zero_principal():
+    emi = _estimate_emi(
+        principal=0,
+        annual_rate=12,
+        months=12
+    )
+
+    assert emi == 0
+
+def test_estimate_emi_should_return_expected_emi_for_one_month():
+    emi = _estimate_emi(
+        principal=100000,
+        annual_rate=12,
+        months=1
+    )
+
+    assert emi > 100000
+
+def test_dti_should_return_expected_dti_and_score():
+    risk_factors = []
+
+    dti, score = _score_dti(
+        annual_income=1200000,
+        requested_amount=100000,
+        existing_emis=5000,
+        risk_factors=risk_factors
+    )
+
+    assert dti < 0.5
+    assert score > 0
+    assert len(risk_factors) == 0
+
+def test_dti_high_should_return_expected_dti_and_score():
+    risk_factors = []
+
+    dti, score = _score_dti(
+        annual_income=300000,
+        requested_amount=1000000,
+        existing_emis=30000,
+        risk_factors=risk_factors
+    )
+
+    assert dti > 0.5
+    assert score >= 0
+    assert any("debt-to-income ratio" in x for x in risk_factors)
+
+def test_dti_should_return_one_when_zero_income():
+    risk_factors = []
+
+    dti, score = _score_dti(
+        annual_income=0,
+        requested_amount=100000,
+        existing_emis=0,
+        risk_factors=risk_factors
+    )
+
+    assert dti == 1.0
+    assert score == 0
+
+def test_dti_should_return_at_least_zero_when_positive_income_at_boundary():
+    risk_factors = []
+
+    dti, score = _score_dti(
+        annual_income=600000,
+        requested_amount=500000,
+        existing_emis=10000,
+        risk_factors=risk_factors
+    )
+
+    assert score >= 0
+
+def test_employment_should_return_one_when_salaried():
+    risk_factors = []
+    score = _score_employment("salaried", risk_factors)
+
+    assert score == 1.0
+    assert risk_factors == []
+
+def test_employment_should_return_expected_when_business_owner():
+    risk_factors = []
+    score = _score_employment("business_owner", risk_factors)
+
+    assert score == 0.75
+
+
+def test_employment_should_return_expected_when_self_employed():
+    risk_factors = []
+    score = _score_employment("self_employed", risk_factors)
+
+    assert score == 0.55
+    assert "self-employed (variable income)" in risk_factors
+
+def test_employment_should_return_expected_when_freelancer():
+    risk_factors = []
+    score = _score_employment("freelancer", risk_factors)
+
+    assert score == 0.5
+
+def test_income_ratio_should_return_score_as_1():
+    risk_factors = []
+
+    score = _score_income_ratio(
+        annual_income=1000000,
+        requested_amount=200000,
+        risk_factors=risk_factors
+    )
+
+    assert score == 1.0
+    assert risk_factors == []
+
+def test_income_ratio_should_return_expected_when_high_requested_amount():
+    risk_factors = []
+
+    score = _score_income_ratio(
+        annual_income=300000,
+        requested_amount=1200000,
+        risk_factors=risk_factors
+    )
+
+    assert score < 1
+    assert "high loan-to-income ratio" in risk_factors
+
+def test_income_ratio_should_return_expected_when_extreme_requested_amount():
+    risk_factors = []
+
+    score = _score_income_ratio(
+        annual_income=200000,
+        requested_amount=2000000,
+        risk_factors=risk_factors
+    )
+
+    assert score < 0.5
+    assert "requested amount exceeds 5x annual income" in risk_factors
+
+def test_income_ratio_should_return_one_when_zero_requested():
+    risk_factors = []
+
+    score = _score_income_ratio(
+        annual_income=1000000,
+        requested_amount=0,
+        risk_factors=risk_factors
+    )
+
+    assert score == 1.0
+
+def test_tenure_should_return_one_when_above_five_years():
+    risk_factors = []
+    score = _score_tenure(6, risk_factors)
+
+    assert score == 1.0
+
+def test_tenure_should_return_less_than_one_when_less_than_one_year():
+    risk_factors = []
+    score = _score_tenure(0.5, risk_factors)
+
+    assert score < 1
+    assert "less than 1 year in current employment" in risk_factors
+
+def test_tenure_should_return_expected_when_between_one_and_two():
+    risk_factors = []
+    score = _score_tenure(1.5, risk_factors)
+
+    assert "low employment tenure (< 2 years)" in risk_factors
+
+def test_tenure_should_return_zero_when_zero_years():
+    risk_factors = []
+    score = _score_tenure(0, risk_factors)
+
+    assert score == 0
+
+def test_band_should_return_low():
+    assert _score_to_band(0.75) == RiskBand.LOW
+
+def test_band_should_return_medium():
+    assert _score_to_band(0.55) == RiskBand.MEDIUM
+
+def test_band_should_return_high():
+    assert _score_to_band(0.35) == RiskBand.HIGH
+
+def test_band_should_return_very_high():
+    assert _score_to_band(0.34) == RiskBand.VERY_HIGH
+
+def test_credit_score_best_case():
+    req = CreditScoreRequest(
+        application_id=1,
+        cibil_score=850,
+        annual_income=2000000,
+        requested_amount=100000,
+        existing_monthly_emis=0,
+        employment_type="salaried",
+        years_employed=10,
+        loan_type="personal"
+    )
+
+    result = score_credit_risk(req)
+
+    assert result.risk_band == RiskBand.LOW
+    assert result.ml_credit_score > 0.8
+
+def test_credit_score_should_return_the_expected_mlcreditscore_when_borderline():
+    req = CreditScoreRequest(
+        application_id=3,
+        cibil_score=700,
+        annual_income=600000,
+        requested_amount=500000,
+        existing_monthly_emis=10000,
+        employment_type="business_owner",
+        years_employed=2,
+        loan_type="personal"
+    )
+
+    result = score_credit_risk(req)
+
+    assert 0 <= result.ml_credit_score <= 1
+def test_credit_score_should_return_the_expected_mlcreditscore_when_zero_income():
+    req = CreditScoreRequest(
+        application_id=4,
+        cibil_score=750,
+        annual_income=0,
+        requested_amount=100000,
+        existing_monthly_emis=0,
+        employment_type="salaried",
+        years_employed=3,
+        loan_type="personal"
+    )
+
+    result = score_credit_risk(req)
+
+    assert result.debt_to_income_ratio == 1.0
+
+def test_credit_score_should_return_the_expected_mlcreditscore_when_unknown_employment():
+    req = CreditScoreRequest(
+        application_id=5,
+        cibil_score=750,
+        annual_income=1000000,
+        requested_amount=100000,
+        existing_monthly_emis=0,
+        employment_type="freelancer",
+        years_employed=3,
+        loan_type="personal"
+    )
+
+    result = score_credit_risk(req)
+
+    assert result.ml_credit_score > 0

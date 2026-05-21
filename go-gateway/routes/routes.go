@@ -3,6 +3,7 @@ package routes
 import (
 	"loan-risk/handlers"
 	"loan-risk/middleware"
+	"loan-risk/service"
 	"loan-risk/store"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,8 @@ import (
 
 func Setup(r *gin.Engine) {
 	s := store.New()
-	h := handlers.New(s)
+	svc := service.New(s)
+	h := handlers.New(svc)
 
 	r.GET("/health", handlers.HealthCheck)
 

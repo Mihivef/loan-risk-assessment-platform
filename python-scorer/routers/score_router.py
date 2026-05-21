@@ -12,11 +12,7 @@ router = APIRouter()
 
 @router.post("/score/credit-risk", response_model=CreditScoreResponse)
 async def credit_risk_endpoint(req: CreditScoreRequest):
-    """
-    ML Credit Risk Scoring.
-    Called by Go Gateway right after receiving a loan application.
-    Result is logged to PostgreSQL ml_score_logs for audit + retraining.
-    """
+  
     try:
         result = score_credit_risk(req)
 
@@ -30,7 +26,7 @@ async def credit_risk_endpoint(req: CreditScoreRequest):
                 result.confidence,
             )
         except Exception as db_err:
-            print(f"⚠️  DB log failed (non-fatal): {db_err}")
+            print(f"DB log failed (non-fatal): {db_err}")
 
         return result
 
@@ -40,11 +36,7 @@ async def credit_risk_endpoint(req: CreditScoreRequest):
 
 @router.post("/score/fraud-check", response_model=FraudCheckResponse)
 async def fraud_check_endpoint(req: FraudCheckRequest):
-    """
-    Fraud Detection.
-    Runs pattern analysis on applicant profile.
-    Result is logged to PostgreSQL for fraud pattern analysis.
-    """
+
     try:
         result = check_fraud(req)
 
@@ -55,7 +47,7 @@ async def fraud_check_endpoint(req: FraudCheckRequest):
                 result.flags,
             )
         except Exception as db_err:
-            print(f"⚠️  DB log failed (non-fatal): {db_err}")
+            print(f"DB log failed (non-fatal): {db_err}")
 
         return result
 
@@ -65,10 +57,7 @@ async def fraud_check_endpoint(req: FraudCheckRequest):
 
 @router.get("/score/factors/{app_id}")
 async def get_score_factors(app_id: int):
-    """
-    Returns the ML model feature weights + full score history for an application.
-    Useful for explainability — regulators require this in lending systems.
-    """
+
     history = []
     try:
         history = await get_score_history(app_id)

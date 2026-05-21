@@ -1,0 +1,14 @@
+with-expecter: true
+packages:
+  loan-risk/service:
+    interfaces:
+      LoanServicer:
+    config:
+      dir: "mocks"
+      outpkg: "mocks"
+  loan-risk/store:
+    interfaces:
+      Storer:
+    config:
+      dir: "mocks"
+      outpkg: "mocks"

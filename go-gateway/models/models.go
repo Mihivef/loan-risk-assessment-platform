@@ -160,3 +160,12 @@ type EMIResponse struct {
 	TotalPayable  float64 `json:"total_payable"`
 	TotalInterest float64 `json:"total_interest"`
 }
+
+type PipelineSummary struct {
+	CreditScore      float64           `json:"credit_score"`
+	RiskBand         RiskBand          `json:"risk_band"`
+	DebtToIncome     float64           `json:"debt_to_income"`
+	FraudProbability float64           `json:"fraud_probability"`
+	IsSuspicious     bool              `json:"is_suspicious"`
+	Decision         ApplicationStatus `json:"decision"`
+}

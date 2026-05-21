@@ -1,8 +1,12 @@
 package com.loanrisk.service;
 
 import com.loanrisk.model.*;
+import com.loanrisk.rules.EMICalculator;
 import com.loanrisk.rules.LendingPolicyRules;
+import com.loanrisk.rules.RateCalculator;
+
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 import java.util.List;
 
@@ -11,42 +15,42 @@ import java.util.List;
 public class PolicyEngineService {
 
     private final LendingPolicyRules       rules;
+    private final RateCalculator           rateCalc;   
+    private final EMICalculator            emiCalc;
     private final PolicyDecisionRepository repo;
 
-    public PolicyEngineService(LendingPolicyRules rules, PolicyDecisionRepository repo) {
+    public PolicyEngineService(LendingPolicyRules rules, RateCalculator rateCalc, EMICalculator emiCalc, PolicyDecisionRepository repo) {
         this.rules = rules;
-        this.repo  = repo;
-    }
+        this.rateCalc = rateCalc;
+        this.emiCalc = emiCalc;
+        this.repo = repo;
 
+    }
     public PolicyEvalResponse evaluate(PolicyEvalRequest req) {
-        List<LendingPolicyRules.RuleViolation> violations = rules.evaluateHardRules(req);
+        var violations = rules.evaluateHardRules(req);
         PolicyEvalResponse response;
 
         if (!violations.isEmpty()) {
-            response = PolicyEvalResponse.rejected(req.applicationId, violations.get(0).reason());
+            response = PolicyEvalResponse.rejected(req.applicationId,
+                violations.get(0).reason());
         } else {
-            double rate = rules.interestRateForRisk(req.riskBand);
-            if ("self_employed".equals(req.employmentType)) rate += 0.5;
-            if (req.yearsEmployed >= 5)                     rate -= 0.25;
-            rate = Math.round(rate * 100.0) / 100.0;
-
-            double approved = rules.adjustedApprovedAmount(req);
-            double emi      = rules.calculateEmi(approved, rate, req.tenureMonths);
-            response = PolicyEvalResponse.approved(req.applicationId, approved, rate, emi,
-                buildNotes(req, rate, approved));
+            double rate     = rateCalc.calculateRate(req);     
+            double approved = rateCalc.adjustedAmount(req);     
+            double emi      = emiCalc.calculate(approved, rate, req.tenureMonths); 
+            response = PolicyEvalResponse.approved(req.applicationId,
+                approved, rate, emi, buildNotes(req, rate, approved));
         }
 
         saveDecision(req, response);
         return response;
     }
 
-    public EmiResponse calculateEmi(EmiRequest req) {
-        double emi   = rules.calculateEmi(req.principal, req.annualRate, req.tenureMonths);
-        double total = Math.round(emi * req.tenureMonths * 100.0) / 100.0;
-        EmiResponse r = new EmiResponse();
-        r.monthlyEmi    = emi;
-        r.totalPayable  = total;
-        r.totalInterest = Math.round((total - req.principal) * 100.0) / 100.0;
+   public EmiResponse calculateEmi(EmiRequest req) {
+        double emi = emiCalc.calculate(req.principal, req.annualRate, req.tenureMonths);
+        EmiResponse r  = new EmiResponse();
+        r.monthlyEmi   = emi;
+        r.totalPayable  = emiCalc.totalPayable(emi, req.tenureMonths);
+        r.totalInterest = emiCalc.totalInterest(emi, req.tenureMonths, req.principal);
         return r;
     }
 
@@ -76,4 +80,7 @@ public class PolicyEngineService {
         if (req.yearsEmployed >= 5)                     sb.append("-0.25% loyalty discount. ");
         return sb.toString().trim();
     }
+    public Map<String, Object> getPolicy(String loanType) {
+        return rules.getPolicyForLoanType(loanType);
+}
 }

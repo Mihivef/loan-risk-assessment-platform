@@ -1,8 +1,4 @@
-"""
-Loan Risk Assessment — Python FastAPI ML Scorer  (Port 8000)
-Startup: connects to PostgreSQL, runs migration
-Shutdown: closes DB pool gracefully
-"""
+
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,15 +8,14 @@ from db.database import migrate, close_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup/shutdown lifecycle. Code before yield = startup; after = shutdown."""
-    print("🚀 Python scorer starting...")
+
+    print(" Python scorer starting...")
     try:
         await migrate()
     except Exception as e:
-        # Allow startup without DB so you can test scoring logic standalone
-        print(f"⚠️  DB migration skipped (running without DB?): {e}")
+        print(f" DB migration skipped (running without DB?): {e}")
     yield
-    print("🛑 Shutting down...")
+    print(" Shutting down...")
     await close_pool()
 
 

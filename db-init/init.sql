@@ -1,25 +1,19 @@
--- ─────────────────────────────────────────────────────────────────────────────
--- Loan Risk Assessment Platform — PostgreSQL Initialisation Script
--- Runs automatically when the postgres container is first created.
--- Each service also runs its own migrations (Go, Java JPA, Python asyncpg).
--- ─────────────────────────────────────────────────────────────────────────────
 
--- ── Table 1: loan_applications (owned by Go Gateway) ─────────────────────────
 CREATE TABLE IF NOT EXISTS loan_applications (
     id                    SERIAL PRIMARY KEY,
     applicant_name        VARCHAR(100)   NOT NULL,
     applicant_email       VARCHAR(100)   NOT NULL,
     applicant_phone       VARCHAR(20)    NOT NULL,
-    loan_type             VARCHAR(20)    NOT NULL,   -- personal/home/vehicle/business/education
+    loan_type             VARCHAR(20)    NOT NULL,   
     requested_amount      NUMERIC(15,2)  NOT NULL,
     tenure_months         INT            NOT NULL,
     purpose               TEXT           NOT NULL,
     annual_income         NUMERIC(15,2)  NOT NULL,
     existing_monthly_emis NUMERIC(10,2)  DEFAULT 0,
-    employment_type       VARCHAR(30)    NOT NULL,   -- salaried/self_employed/business_owner
+    employment_type       VARCHAR(30)    NOT NULL,   
     employer_name         VARCHAR(100)   NOT NULL,
     years_employed        NUMERIC(4,1)   DEFAULT 0,
-    cibil_score           INT            NOT NULL,   -- 300–900
+    cibil_score           INT            NOT NULL,   
     ml_credit_score       NUMERIC(5,4)   DEFAULT 0,  
     risk_band             VARCHAR(20)    DEFAULT 'MEDIUM',
     fraud_probability     NUMERIC(5,4)   DEFAULT 0,
@@ -39,13 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_loan_apps_status    ON loan_applications(status);
 CREATE INDEX IF NOT EXISTS idx_loan_apps_email     ON loan_applications(applicant_email);
 CREATE INDEX IF NOT EXISTS idx_loan_apps_loan_type ON loan_applications(loan_type);
 CREATE INDEX IF NOT EXISTS idx_loan_apps_created   ON loan_applications(created_at DESC);
-
--- ── Table 2: policy_decisions (owned by Java Engine — JPA creates this too) ──
--- Java's JPA will manage this table; this ensures it exists before Java starts.
 CREATE TABLE IF NOT EXISTS policy_decisions (
     id                  BIGSERIAL      PRIMARY KEY,
     application_id      INT            NOT NULL,
-    decision            VARCHAR(20)    NOT NULL,   -- APPROVED / REJECTED
+    decision            VARCHAR(20)    NOT NULL,
     loan_type           VARCHAR(20),
     requested_amount    NUMERIC(15,2),
     approved_amount     NUMERIC(15,2),
@@ -63,11 +54,10 @@ CREATE INDEX IF NOT EXISTS idx_pd_application_id ON policy_decisions(application
 CREATE INDEX IF NOT EXISTS idx_pd_decision        ON policy_decisions(decision);
 CREATE INDEX IF NOT EXISTS idx_pd_created_at      ON policy_decisions(created_at DESC);
 
--- ── Table 3: ml_score_logs (owned by Python Scorer) ──────────────────────────
 CREATE TABLE IF NOT EXISTS ml_score_logs (
     id                  SERIAL         PRIMARY KEY,
     application_id      INT            NOT NULL,
-    score_type          VARCHAR(30)    NOT NULL,   -- credit_risk / fraud_check
+    score_type          VARCHAR(30)    NOT NULL,   
     ml_credit_score     NUMERIC(6,4),
     risk_band           VARCHAR(20),
     fraud_probability   NUMERIC(6,4),
@@ -81,7 +71,6 @@ CREATE TABLE IF NOT EXISTS ml_score_logs (
 CREATE INDEX IF NOT EXISTS idx_ml_logs_app_id ON ml_score_logs(application_id);
 CREATE INDEX IF NOT EXISTS idx_ml_logs_type   ON ml_score_logs(score_type);
 
--- ── Seed data: sample applications for demo ───────────────────────────────────
 INSERT INTO loan_applications (
     applicant_name, applicant_email, applicant_phone, loan_type,
     requested_amount, tenure_months, purpose, annual_income,
@@ -113,9 +102,7 @@ INSERT INTO loan_applications (
 )
 ON CONFLICT DO NOTHING;
 
--- ── Useful views ──────────────────────────────────────────────────────────────
 
--- approval_rate_view: quick dashboard metric
 CREATE OR REPLACE VIEW approval_rate_view AS
 SELECT
     COUNT(*)                                                 AS total,
@@ -129,7 +116,6 @@ SELECT
     ROUND(AVG(approved_amount) FILTER (WHERE status='approved'), 2) AS avg_approved
 FROM loan_applications;
 
--- risk_band_distribution_view
 CREATE OR REPLACE VIEW risk_band_distribution AS
 SELECT
     risk_band,

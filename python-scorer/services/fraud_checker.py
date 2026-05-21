@@ -1,13 +1,4 @@
-"""
-Fraud Detection Service
 
-Simulates a real-time fraud detection model.
-In production this would:
-  - Query a feature store for historical applicant behaviour
-  - Run an isolation forest or gradient boosting model
-  - Check against a sanctions/blacklist database
-  - Apply velocity rules (how many applications in last 30 days)
-"""
 
 from models.schemas import FraudCheckRequest, FraudCheckResponse
 from typing import List
@@ -19,10 +10,7 @@ DISPOSABLE_DOMAINS = {"mailinator.com", "tempmail.com", "guerrillamail.com", "th
 
 
 def check_fraud(req: FraudCheckRequest) -> FraudCheckResponse:
-    """
-    Run fraud checks on the applicant's profile.
-    Returns a fraud probability (0–1) and list of flags.
-    """
+  
     flags: List[str] = []
     fraud_score = 0.0
 
