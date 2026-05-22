@@ -160,7 +160,7 @@ func applyPolicyDecision(app *models.LoanApplication, resp *models.PolicyEvalRes
 }
 
 func fallbackCreditScore(app *models.LoanApplication) *models.CreditScoreResponse {
-	score := float64(app.CibilScore-300) / 60.0
+	score := float64(app.CibilScore-300) / 600.0
 
 	band := models.RiskHigh
 	if app.CibilScore >= 750 {

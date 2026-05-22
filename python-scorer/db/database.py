@@ -1,12 +1,3 @@
-"""
-Database layer for Python FastAPI scorer.
-Uses asyncpg — the fastest async PostgreSQL driver for Python.
-
-Why asyncpg over psycopg2?
-  - asyncpg is fully async/await — no thread blocking
-  - FastAPI is async-first; asyncpg integrates naturally
-  - 3–5x faster than psycopg2 for bulk operations
-"""
 
 import asyncpg
 import os
@@ -26,7 +17,7 @@ CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS ml_score_logs (
     id                  SERIAL PRIMARY KEY,
     application_id      INT          NOT NULL,
-    score_type          VARCHAR(30)  NOT NULL,  -- 'credit_risk' or 'fraud_check'
+    score_type          VARCHAR(30)  NOT NULL,  
     ml_credit_score     NUMERIC(6,4),
     risk_band           VARCHAR(20),
     fraud_probability   NUMERIC(6,4),
@@ -43,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_ml_logs_type   ON ml_score_logs(score_type);
 
 
 async def get_pool() -> asyncpg.Pool:
-    """Returns the shared connection pool, creating it if needed."""
+   
     global _pool
     if _pool is None:
         _pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
@@ -51,7 +42,7 @@ async def get_pool() -> asyncpg.Pool:
 
 
 async def migrate():
-    """Create the ml_score_logs table on startup."""
+    
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(CREATE_TABLE_SQL)
@@ -66,7 +57,6 @@ async def log_credit_score(
     dti: float,
     confidence: float
 ):
-    """Insert a credit score result into ml_score_logs for audit/analysis."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
@@ -88,7 +78,6 @@ async def log_fraud_check(
     fraud_probability: float,
     flags: list
 ):
-    """Insert a fraud check result into ml_score_logs."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
@@ -102,7 +91,6 @@ async def log_fraud_check(
 
 
 async def get_score_history(application_id: int) -> list:
-    """Retrieve all ML scores logged for a given application_id."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -113,7 +101,6 @@ async def get_score_history(application_id: int) -> list:
 
 
 async def close_pool():
-    """Gracefully close the DB pool on shutdown."""
     global _pool
     if _pool:
         await _pool.close()

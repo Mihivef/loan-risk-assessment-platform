@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class PolicyEvalResponse {
 
     @JsonProperty("application_id")   public int    applicationId;
-    @JsonProperty("decision")         public String decision;         // "APPROVED" or "REJECTED"
+    @JsonProperty("decision")         public String decision;         
     @JsonProperty("approved_amount")  public double approvedAmount;
     @JsonProperty("interest_rate_percent") public double interestRate;
     @JsonProperty("monthly_emi")      public double monthlyEmi;
