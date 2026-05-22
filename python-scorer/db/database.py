@@ -104,4 +104,4 @@ async def close_pool():
     global _pool
     if _pool:
         await _pool.close()
-        _pool = Non
+        _pool = None
